@@ -1,85 +1,104 @@
-# import psycopg2
-# import re
-#
-# # PostgreSQL ga ulanish
-# conn = psycopg2.connect(
-#     dbname="contact_db",
-#     user="postgres",
-#     password="1234",  # o'zingizni parolingiz
-#     host="localhost"
-# )
-# cur = conn.cursor()
-#
-# # Jadval mavjud bo'lmasa yaratamiz
-# cur.execute("""
-# CREATE TABLE IF NOT EXISTS contact (
-#     id SERIAL PRIMARY KEY,
-#     name VARCHAR(100) NOT NULL,
-#     phone VARCHAR(20) NOT NULL
-# )
-# """)
-# conn.commit()
-#
-#
-# class Contact:
-#     def __init__(self, name, phone):
-#         self.name = name
-#         self.phone = phone
-#
-#     def __str__(self):
-#         return self.phone
-#
-#     def info(self):
-#         print(f"name: {self.name} phone: {self.phone}")
-#
-#
-# def contact_manager():
-#     while True:
-#         kod = input("\n 1. add contact\n 2. view contacts\n 3. delete contact\n 4. quit\nTanlang: ")
-#
-#         if kod == "1":
-#             name = input("Name: ")
-#             phone = input("Phone: ")
-#             r_name = r"^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$"
-#             if re.match(r_name, phone):
-#                 cur.execute("INSERT INTO contacts (name, phone) VALUES (%s, %s)", (name, phone))
-#                 conn.commit()
-#                 print("✅ Contact added")
-#             else:
-#                 print("❌ Telefon raqam noto‘g‘ri kiritilgan")
-#
-#         elif kod == "2":
-#             cur.execute("SELECT name, phone FROM contacts")
-#             rows = cur.fetchall()
-#             if rows:
-#                 print("\n📒 Kontaktlar ro'yxati:")
-#                 for row in rows:
-#                     print(f"name: {row[0]}, phone: {row[1]}")
-#             else:
-#                 print("❌ Hali kontakt yo‘q")
-#
-#         elif kod == "3":
-#             name = input("Delete uchun name: ")
-#             cur.execute("DELETE FROM contacts WHERE name = %s", (name,))
-#             conn.commit()
-#             print("🗑 Kontakt o‘chirildi (agar mavjud bo‘lsa)")
-#
-#         elif kod == "4":
-#             print("👋 Dastur tugadi")
-#             break
-#
-#         else:
-#             print("❌ Noto‘g‘ri tanlov, qayta urinib ko‘ring")
-#
-#
-# contact_manager()
-#
-# # dastur tugaganda ulanishni yopamiz
-# cur.close()
-# conn.close()
-#
-# cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
-# print("📋 Bazadagi jadvallar:")
-# for row in cur.fetchall():
-#     print("-", row[0])
+import psycopg2
+from datetime import datetime
+
+
+conn = psycopg2.connect(
+    host="localhost",
+    database="attendance_db",
+    user="postgres",
+    password="1234"
+)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS students (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE,
+    kelgan TIMESTAMP,
+    ketgan TIMESTAMP
+)
+""")
+conn.commit()
+
+
+default_students = ["Ali", "Laylo", "Jasur"]
+for student in default_students:
+    cursor.execute("INSERT INTO students (name) VALUES (%s) ON CONFLICT (name) DO NOTHING;", (student,))
+conn.commit()
+
+
+
+def show_student_status(name):
+    cursor.execute("SELECT kelgan, ketgan FROM students WHERE name = %s;", (name,))
+    result = cursor.fetchone()
+    if result:
+        kelgan, ketgan = result
+        print(f"\n👤 {name}ning yo‘qlamasi:")
+        print(f"   Kelgan: {kelgan}")
+        print(f"   Ketgan: {ketgan}\n")
+    else:
+        print(" Bunday o‘quvchi topilmadi.\n")
+
+
+def teacher_panel():
+    while True:
+        print("\n O‘qituvchi paneli:")
+        print("1. Barcha o‘quvchilarni ko‘rish")
+        print("2. O‘quvchini kelgan deb belgilash")
+        print("3. O‘quvchini ketgan deb belgilash")
+        print("4. Chiqish")
+        tanlov = input("Tanlovni kiriting: ")
+
+        if tanlov == "1":
+            cursor.execute("SELECT name, kelgan, ketgan FROM students ORDER BY id;")
+            rows = cursor.fetchall()
+            for row in rows:
+                print(f"{row[0]}: kelgan={row[1]}, ketgan={row[2]}")
+        elif tanlov == "2":
+            name = input("O‘quvchi ismini kiriting: ")
+            vaqt = datetime.now()
+            cursor.execute("UPDATE students SET kelgan = %s WHERE name = %s;", (vaqt, name))
+            conn.commit()
+            print(f"{name} kelgan vaqt belgilang.")
+        elif tanlov == "3":
+            name = input("O‘quvchi ismini kiriting: ")
+            vaqt = datetime.now()
+            cursor.execute("UPDATE students SET ketgan = %s WHERE name = %s;", (vaqt, name))
+            conn.commit()
+            print(f"{name} ketgan vaqt belgilang.")
+        elif tanlov == "4":
+            break
+        else:
+            print("Noto‘g‘ri tanlov!\n")
+
+
+def student_panel():
+    name = input("Ismingizni kiriting: ")
+    show_student_status(name)
+
+
+def main():
+    while True:
+        print("\n Yo‘qlama tizimi (PostgreSQL bilan)")
+        print("1. O‘qituvchi sifatida kirish")
+        print("2. O‘quvchi sifatida kirish")
+        print("3. Chiqish")
+        tanlov = input("Tanlovni kiriting: ")
+
+        if tanlov == "1":
+            teacher_panel()
+        elif tanlov == "2":
+            student_panel()
+        elif tanlov == "3":
+            print("Tizimdan chiqildi.")
+            break
+        else:
+            print("Noto‘g‘ri tanlov!\n")
+
+
+if __name__ == "__main__":
+    main()
+    cursor.close()
+    conn.close()
+
 
